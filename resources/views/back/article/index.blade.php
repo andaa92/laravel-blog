@@ -15,7 +15,7 @@
         </div>
 
         <div class="mt-3">
-            <button class="btn btn-success mb-2" data-bs-toggle="modal" data-bs-target="#modalCr eate">Create</button>
+            <a href="{{ url('article/create') }}" class="btn btn-success mb-2">Create</a>
 
             @if ($errors->any())
                 <div class="my-3">
@@ -42,14 +42,14 @@
                 <tr>
                     <th>No</th>
                     <th>Title</th>
-                    {{-- <th>Category</th>
+                    <th>Category</th>
                     <th>Status</th>
                     <th>Publish Date</th>
-                    <th>Function</th> --}}
+                    <th>Function</th>
                 </tr>
             </thead>
             <tbody>
-               
+
             </tbody>
         </table>
         </div>
@@ -83,12 +83,12 @@
     <script src="https://cdn.datatables.net/2.2.2/js/dataTables.bootstrap5.js"></script>
 
     <script>
-        $(document). ready(function(){
+        $(document).ready(function() {
             $('#dataTable').DataTable({
                 processing: true,
                 serverside: true,
                 ajax: '{{ url()->current() }}',
-                columns:[
+                columns: [
                     {
                         data: 'id',
                         name: 'id'
@@ -97,8 +97,28 @@
                         data: 'title',
                         name: 'title'
                     },
+                    {
+                        data: 'category_id',
+                        name: 'category_id'
+                    },
+                    {
+                        data: 'views',
+                        name: 'views'
+                    },
+                    {
+                        data: 'status',
+                        name: 'status'
+                    },
+                    {
+                        data: 'publish_date',
+                        name: 'publish_date'
+                    },
+                    {
+                        data: 'button',
+                        name: 'button'
+                    },
                 ]
             });
-        }); 
+        });
     </script>
 @endpush
