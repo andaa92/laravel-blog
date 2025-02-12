@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Back;
 
-use App\Http\Controllers\Controller;
+use App\Models\Category;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 
 class CategoryController extends Controller
 {
@@ -12,15 +14,9 @@ class CategoryController extends Controller
      */
     public function index()
     {
-        return view('back.category.index');
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
+        return view('back.category.index', [
+            'categories' => Category::latest()->get()
+        ]);
     }
 
     /**
@@ -28,23 +24,15 @@ class CategoryController extends Controller
      */
     public function store(Request $request)
     {
-        //
-    }
+        $data = $request->validate([
+            'name' => 'required|min:3'
+        ]);
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
+        $data['slug'] = Str::slug($data['name']);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
+        Category::create($data);
+
+        return back()->with('success', 'Categories has been created');
     }
 
     /**
@@ -52,7 +40,15 @@ class CategoryController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $data = $request->validate([
+            'name' => 'required|min:3'
+        ]);
+
+        $data['slug'] = Str::slug($data['name']);
+
+        Category::find($id)->update($data);
+
+        return back()->with('success', 'Categories has been created');
     }
 
     /**
@@ -60,6 +56,8 @@ class CategoryController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        Category::find($id)->delete();
+
+        return back()->with('success', 'Categories has been delet');
     }
 }
