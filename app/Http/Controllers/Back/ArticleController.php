@@ -4,108 +4,158 @@ namespace App\Http\Controllers\Back;
 
 use App\Models\Article;
 use App\Models\Category;
-use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ArticleRequest;
+use App\Http\Requests\UpdateArticleRequest;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
-use Yajra\DataTables\Contracts\DataTable;
 
 class ArticleController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Tampilkan list artikel. 
+     * Jika request Ajax (DataTables), kembalikan JSON.
      */
-    public function index()
+    public function index(Request $request)
     {
-        if (request()->ajax()) {
-            $article = Article::with('Category')->latest()->get();
+        // Jika request dari DataTables (AJAX)
+        if ($request->ajax()) {
+            // Gunakan query builder tanpa ->get() agar serverSide processing berfungsi
+            $articles = Article::with('category')->latest();
 
-            return DataTables::of($article)->make()
-                    ->addColumn('category_id', function($article){
-                        return $article->Category->name;
-                    })
-                    ->addColumn('status', function($article){
-                        if ($article->status == 0) {
-                            return '<span class="badge bg-danger">Private</span>';
-                        } else {
-                            return '<span class="badge bg-success">Published</span';
-                        }
-                        
-                    })
-                    ->addColumn('button', function($article){
-                        return '<div>
-                                    <td class="text-center">
-                                        <a href="" class="btn btn-secondary">Detail</a>
-                                        <a href="" class="btn btn-primary">Edit</a>
-                                        <a href="" class="btn btn-danger">Delete</a>
-                                    </td>
-                                </div>';
-                    })
-                    ->rawColumns(['category_id', 'status', 'button'])
-                    ->make();
+            return DataTables::of($articles)
+                ->addIndexColumn()  // Menambahkan kolom DT_RowIndex
+                ->addColumn('category', function($article) {
+                    // Tampilkan nama kategori (cek null terlebih dulu)
+                    return $article->category ? $article->category->name : '-';
+                })
+                ->addColumn('status', function($article) {
+                    // Tampilkan badge status
+                    return $article->status == 0
+                        ? '<span class="badge bg-danger">Private</span>'
+                        : '<span class="badge bg-success">Published</span>';
+                })
+                ->addColumn('button', function($article) {
+                    // Tombol aksi (Detail, Edit, Delete)
+                    // Sesuaikan route jika perlu
+                    return '
+                        <div class="text-center">
+                            <a href="'.route('article.show', $article->id).'" class="btn btn-secondary btn-sm">Detail</a>
+                            <a href="'.route('article.edit', $article->id).'" class="btn btn-primary btn-sm">Edit</a>
+                            <button class="btn btn-danger btn-sm" onclick="deleteArticle('.$article->id.')">Delete</button>
+                        </div>
+                    ';
+                })
+                // Pastikan kolom yang mengandung HTML ditambahkan di rawColumns
+                ->rawColumns(['status','button'])
+                ->make(true);
         }
+
+        // Jika bukan Ajax, tampilkan Blade
         return view('back.article.index');
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Form create artikel.
      */
     public function create()
     {
-        return view('back.article.create',[
-            'categories' => Category::get()
+        return view('back.article.create', [
+            'categories' => Category::all()
         ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Simpan artikel baru.
      */
     public function store(ArticleRequest $request)
-    { 
+    {
         $data = $request->validated();
 
-        $file = $request->file('img'); //img
-        $fileName = uniqid().'.'.$file->getClientOriginalExtension(); //jpg,jpeg
-        $file->storeAs('public/back/', $fileName); //public/back/126783gh.jpg
-
+        // Upload file gambar
+        $file = $request->file('img');
+        $fileName = uniqid().'.'.$file->getClientOriginalExtension();
+        $file->storeAs('public/back/', $fileName);
         $data['img'] = $fileName;
-        $slug['slug'] = Str::slug($data['title']);
+
+        // Tambahkan slug
+        $data['slug'] = Str::slug($data['title']);
 
         Article::create($data);
 
-        return redirect(url('article'))->with('success', 'Data article has been created');
+        return redirect()->route('article.index')
+            ->with('success', 'Data article has been created');
     }
 
     /**
-     * Display the specified resource.
+     * Detail artikel.
      */
-    public function show(string $id)
+    public function show($id)
     {
-        //
+        return view('back.article.show', [
+            'article' => Article::findOrFail($id)
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Form edit artikel.
      */
-    public function edit(string $id)
+    public function edit($id)
     {
-        //
+        return view('back.article.update', [
+            'article' => Article::findOrFail($id),
+            'categories' => Category::all()
+        ]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update artikel.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdateArticleRequest $request, $id)
     {
-        //
+        $data = $request->validated();
+
+        // Jika ada file baru
+        if ($request->hasFile('img')) {
+            $file = $request->file('img');
+            $fileName = uniqid().'.'.$file->getClientOriginalExtension();
+            $file->storeAs('public/back/', $fileName);
+
+            // Hapus file lama
+            Storage::delete('public/back/'.$request->oldImg);
+
+            $data['img'] = $fileName;
+        } else {
+            // Pakai file lama
+            $data['img'] = $request->oldImg;
+        }
+
+        // Tambahkan slug
+        $data['slug'] = Str::slug($data['title']);
+
+        // Update data
+        Article::findOrFail($id)->update($data);
+
+        return redirect()->route('article.index')
+            ->with('success', 'Data article has been updated');
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Hapus artikel.
      */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        //
+        $article = Article::findOrFail($id);
+
+        // Hapus file gambar
+        Storage::delete('public/back/'.$article->img);
+
+        // Hapus record di database
+        $article->delete();
+
+        // Return response JSON untuk notifikasi di front-end
+        return response()->json(['message' => 'Article deleted successfully']);
     }
 }
